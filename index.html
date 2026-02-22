@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
+  <title>Kallanum Policeum · Royal Deduction</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', 'Cochin', Georgia, 'Times New Roman', serif;
+    }
+
+    /* ===== ROYAL PALETTE ===== */
+    /* Deep Wine Brown: #2a120a */
+    /* Royal Chestnut: #6b3a22 */
+    /* Aged Parchment: #f3e2c7 */
+    /* Antique Gold: #e6b86a */
+    /* Burnt Gold: #b8893c */
+    
+    body {
+      background: radial-gradient(circle at top, #4a1f14 0%, #2a120a 70%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.5rem;
+    }
+
+    .game-container {
+      max-width: 780px;
+      width: 100%;
+      background: linear-gradient(160deg, #7a4328 0%, #4e2918 100%);
+      border: 6px double #e6b86a;
+      border-radius: min(8vw, 56px) min(4vw, 28px) min(8vw, 56px) min(4vw, 28px);
+      box-shadow: 0 30px 40px rgba(0,0,0,0.85), inset 0 0 25px rgba(255,215,140,0.25);
+      padding: 1.5rem 1rem;
+      transition: all 0.2s;
+    }
+
+    h1, h2, h3 {
+      font-weight: 500;
+      letter-spacing: 2px;
+      color: #ffedc2;
+      text-shadow: 3px 3px 0 #2a120a;
+    }
+
+    h1 {
+      font-size: clamp(1.8rem, 8vw, 3.8rem);
+      border-bottom: 4px solid #e6b86a;
+      display: inline-block;
+      padding-right: 1rem;
+      margin-bottom: 0.4rem;
+      text-transform: uppercase;
+      word-break: break-word;
+    }
+
+    .sub {
+      color: #f3e2c7;
+      font-size: clamp(1rem, 3.5vw, 1.7rem);
+      border-left: 10px solid #e6b86a;
+      padding-left: 1rem;
+      margin: 0.8rem 0 1.5rem 0;
+      font-style: italic;
+      text-shadow: 2px 2px 0 #2a120a;
+    }
+
+    .ui-panel {
+      background: #5a321e;
+      border: 3px solid #d9a85f;
+      border-radius: 60px 12px 60px 12px;
+      padding: 1.5rem 1rem;
+      box-shadow: inset 0 0 15px rgba(0,0,0,0.6), 0 10px 20px rgba(0,0,0,0.8);
+      margin: 1rem 0;
+    }
+
+    button {
+      background: linear-gradient(145deg, #c14a2a, #8b2f1a);
+      border: 4px solid #f0c878;
+      color: #ffffff;
+      font-weight: bold;
+      font-size: clamp(1.1rem, 4vw, 1.9rem);
+      padding: 0.6rem 1.2rem;
+      border-radius: 50px 10px 50px 10px;
+      box-shadow: 0 8px 0 #5a1b0e, 0 12px 20px black;
+      cursor: pointer;
+      transition: 0.07s linear;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      text-shadow: 2px 2px 0 #5a1b0e;
+      width: fit-content;
+      min-width: 150px;
+      margin: 0.2rem 0;
+    }
+
+    button:active {
+      transform: translateY(6px);
+      box-shadow: 0 3px 0 #5a1b0e, 0 6px 10px black;
+    }
+
+    button:disabled {
+      opacity: 0.4;
+      transform: none;
+      box-shadow: 0 5px 0 #4f2e18;
+      pointer-events: none;
+    }
+
+    .flex-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.8rem;
+      margin: 0.8rem 0;
+    }
+
+    .player-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.6rem;
+      background: #6b3a22;
+      padding: 0.6rem 1rem;
+      border-radius: 50px 8px 50px 8px;
+      border: 2px solid #e6b86a;
+      margin: 0.6rem 0;
+    }
+
+    .player-row input {
+      flex: 4 1 180px;
+      background: #f3e2c7;
+      border: 4px solid #b8893c;
+      padding: 0.6rem 0.8rem;
+      font-size: clamp(0.9rem, 3.5vw, 1.5rem);
+      border-radius: 40px 6px 40px 6px;
+      font-weight: 600;
+      color: #2a120a;
+    }
+
+    /* Style for placeholder-like behavior */
+    .player-row input.default-name {
+      color: #6b3a22;
+      font-style: italic;
+    }
+
+    .player-row input:focus {
+      outline: none;
+      border-color: #e6b86a;
+      background: #fff6e5;
+    }
+
+    .pill-count {
+      background: #b8893c;
+      color: #2a120a;
+      font-size: 1.4rem;
+      font-weight: bold;
+      padding: 0.2rem 1.2rem;
+      border-radius: 40px;
+      border: 2px solid #e6b86a;
+      white-space: nowrap;
+    }
+
+    .role-card {
+      background: linear-gradient(145deg, #f5d28b, #d4a64a);
+      color: #1a0e06;
+      border: 12px double #fff1b8;
+      border-radius: 70px 14px 70px 14px;
+      padding: 1.5rem 1rem;
+      text-align: center;
+      font-size: clamp(2rem, 8vw, 4.5rem);
+      font-weight: bold;
+      box-shadow: 0 0 40px rgba(255,215,120,0.9);
+      margin: 1.2rem 0;
+      text-shadow: 2px 2px 0 rgba(255,215,140,0.5);
+    }
+
+    .role-card small {
+      font-size: clamp(1rem, 4vw, 2rem);
+      display: block;
+      color: #2a1a0b;
+    }
+
+    .safe-badge {
+      background: #1f5f8b;
+      border: 3px solid #e6b86a;
+      color: #fff3d6;
+      padding: 0.3rem 1.2rem;
+      border-radius: 40px;
+      font-size: 1rem;
+      text-shadow: 1px 1px 0 #0d2e44;
+      white-space: nowrap;
+    }
+
+    .thief-badge {
+      background: #3b0f0f;
+      border: 3px solid #8b0000;
+      color: #ffcccc;
+      padding: 0.3rem 1.2rem;
+      border-radius: 40px;
+      font-size: 1rem;
+      text-shadow: 1px 1px 0 #2a0000;
+    }
+
+    .player-tag {
+      background: #b8893c;
+      border-radius: 40px 6px 40px 6px;
+      padding: 0.4rem 1.2rem;
+      font-size: 1.2rem;
+      font-weight: bold;
+      border: 2px solid #e6b86a;
+      color: #2a120a;
+      white-space: nowrap;
+    }
+
+    .score {
+      color: #e6b86a;
+      font-size: 1.5rem;
+      margin-left: auto;
+      font-weight: bold;
+      text-shadow: 2px 2px 0 #2a120a;
+      white-space: nowrap;
+    }
+
+    .hierarchy-line {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.4rem 1rem;
+      background: #2a160b;
+      border: 2px dashed #c89b4a;
+      padding: 0.8rem;
+      border-radius: 60px 10px 60px 10px;
+    }
+
+    .hierarchy-item {
+      color: #f3e2c7;
+      font-size: 1rem;
+      border-bottom: 2px dashed #e6b86a;
+      white-space: nowrap;
+    }
+
+    .leaderboard-entry {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      font-size: 1.4rem;
+      padding: 0.6rem 1.4rem;
+      background: #6b3a22;
+      margin: 0.6rem 0;
+      border-radius: 50px 6px 50px 6px;
+      border: 2px solid #e6b86a;
+    }
+
+    .guess-input {
+      width: 100%;
+      padding: 0.8rem;
+      font-size: 1.3rem;
+      background: #f3e2c7;
+      border: 5px solid #b8893c;
+      border-radius: 50px 6px 50px 6px;
+      margin: 0.8rem 0;
+      color: #2a120a;
+    }
+
+    .guess-input:focus {
+      outline: none;
+      border-color: #e6b86a;
+      background: #fff6e5;
+    }
+
+    /* Scrollable player list for many players */
+    .player-list-scroll {
+      max-height: 350px;
+      overflow-y: auto;
+      padding-right: 5px;
+      margin: 0.5rem 0;
+    }
+
+    .player-list-scroll::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .player-list-scroll::-webkit-scrollbar-track {
+      background: #3d2818;
+      border-radius: 10px;
+    }
+
+    .player-list-scroll::-webkit-scrollbar-thumb {
+      background: #e6b86a;
+      border-radius: 10px;
+      border: 2px solid #b8893c;
+    }
+
+    /* ENHANCED ANIMATION OVERLAYS */
+    .effect-overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+      background: rgba(42,18,10,0.7);
+      backdrop-filter: blur(8px);
+      animation: fadeBgIn 0.3s ease-out;
+    }
+
+    @keyframes fadeBgIn {
+      from { background: rgba(42,18,10,0); backdrop-filter: blur(0); }
+      to { background: rgba(42,18,10,0.7); backdrop-filter: blur(8px); }
+    }
+
+    .swish-card {
+      background: linear-gradient(145deg, #f5d28b, #e6b86a);
+      color: #2a120a;
+      font-size: 5rem;
+      padding: 3rem 4rem;
+      border-radius: 120px 24px 120px 24px;
+      border: 16px double #fff1b8;
+      box-shadow: 0 0 100px #e6b86a, 0 20px 40px rgba(0,0,0,0.6);
+      transform: scale(0) rotate(-20deg);
+      animation: swishPop 1.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+      text-align: center;
+      min-width: 400px;
+    }
+
+    .slap-card {
+      background: linear-gradient(145deg, #8b2f1a, #5a1b0e);
+      color: #f3e2c7;
+      font-size: 4rem;
+      padding: 3rem 3rem;
+      border-radius: 60px 20px 60px 20px;
+      border: 12px ridge #c14a2a;
+      box-shadow: 0 0 100px #c14a2a, 0 20px 40px black;
+      transform: translateX(-200%) rotate(-40deg);
+      animation: slapSwing 1s cubic-bezier(0.3, 1.3, 0.4, 1) forwards;
+      text-align: center;
+      min-width: 500px;
+    }
+
+    .swap-detail {
+      font-size: 2rem;
+      margin-top: 1rem;
+      padding: 1rem;
+      background: rgba(42,18,10,0.5);
+      border-radius: 40px;
+      line-height: 2.5rem;
+      border: 2px solid #e6b86a;
+    }
+
+    .swap-detail span {
+      display: inline-block;
+      background: #e6b86a;
+      color: #2a120a;
+      padding: 0.3rem 1.2rem;
+      border-radius: 40px;
+      margin: 0.3rem;
+      font-weight: bold;
+    }
+
+    @keyframes swishPop {
+      0% { transform: scale(0) rotate(-30deg); opacity: 0; }
+      30% { transform: scale(1.3) rotate(5deg); opacity: 1; }
+      70% { transform: scale(1.1) rotate(-2deg); }
+      100% { transform: scale(1) rotate(0); opacity: 1; }
+    }
+
+    @keyframes slapSwing {
+      0% { transform: translateX(-200%) rotate(-50deg); opacity: 0; }
+      30% { transform: translateX(30px) rotate(8deg); opacity: 1; }
+      60% { transform: translateX(-15px) rotate(-5deg); }
+      85% { transform: translateX(5px) rotate(2deg); }
+      100% { transform: translateX(0) rotate(0); opacity: 1; }
+    }
+
+    .round-score-badge {
+      background: #b8893c;
+      color: #2a120a;
+      font-size: 1.2rem;
+      padding: 0.2rem 0.8rem;
+      border-radius: 30px;
+      display: inline-block;
+      margin: 0.4rem 0;
+      border: 2px solid #e6b86a;
+    }
+
+    @keyframes fadeOut {
+      to { opacity: 0; backdrop-filter: blur(0); }
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    /* ===== OPTIMIZED MOBILE STYLES ===== */
+    @media (max-width: 600px) {
+      .game-container { 
+        padding: 1rem 0.8rem; 
+        max-height: 95vh;
+        overflow-y: auto;
+      }
+      
+      h1 { 
+        font-size: 1.8rem; 
+        text-align: center;
+        display: block;
+      }
+      
+      .sub { 
+        font-size: 1rem; 
+        border-left: 5px solid #e6b86a;
+        padding-left: 0.8rem;
+        margin: 0.5rem 0 1rem;
+      }
+      
+      .ui-panel { 
+        padding: 1rem 0.8rem; 
+        margin: 0.8rem 0;
+      }
+      
+      button { 
+        min-width: 110px; 
+        font-size: 1rem; 
+        padding: 0.5rem 0.8rem;
+        border-width: 3px;
+      }
+      
+      .flex-row { 
+        gap: 0.5rem; 
+        justify-content: center;
+      }
+      
+      .player-row { 
+        padding: 0.5rem 0.8rem; 
+        margin: 0.5rem 0;
+        gap: 0.4rem;
+      }
+      
+      .player-row input { 
+        font-size: 0.9rem; 
+        padding: 0.5rem;
+        border-width: 3px;
+      }
+      
+      .player-tag { 
+        font-size: 0.9rem; 
+        padding: 0.3rem 0.8rem;
+      }
+      
+      .pill-count { 
+        font-size: 1.1rem; 
+        padding: 0.2rem 1rem;
+      }
+      
+      .hierarchy-line { 
+        padding: 0.6rem;
+        gap: 0.3rem 0.6rem;
+      }
+      
+      .hierarchy-item { 
+        font-size: 0.85rem; 
+      }
+      
+      .guess-input { 
+        font-size: 1.1rem; 
+        padding: 0.7rem;
+        border-width: 4px;
+      }
+      
+      .leaderboard-entry { 
+        font-size: 1.1rem; 
+        padding: 0.5rem 1rem; 
+      }
+      
+      .safe-badge, .thief-badge { 
+        font-size: 0.9rem; 
+        padding: 0.2rem 0.8rem;
+      }
+      
+      .score { 
+        font-size: 1.2rem; 
+      }
+      
+      .role-card {
+        padding: 1rem;
+        border-width: 8px;
+      }
+      
+      .role-card small {
+        font-size: 1rem;
+      }
+      
+      .player-list-scroll {
+        max-height: 300px;
+      }
+      
+      .swish-card, .slap-card { 
+        font-size: 2rem; 
+        padding: 1.2rem;
+        min-width: 90%;
+        border-width: 8px;
+      }
+      
+      .swap-detail { 
+        font-size: 1.2rem;
+        line-height: 1.8rem;
+        padding: 0.8rem;
+      }
+      
+      .swap-detail span {
+        padding: 0.2rem 0.6rem;
+        font-size: 1rem;
+      }
+      
+      #guessBtn, #nextRoundBtn, #leaderboardBtn, #newGameBtn {
+        width: 100%;
+        margin: 0.3rem 0;
+      }
+      
+      .flex-row.actions {
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+    }
+
+    @media (max-width: 380px) {
+      h1 { font-size: 1.5rem; }
+      .sub { font-size: 0.9rem; }
+      button { min-width: 90px; font-size: 0.9rem; }
+      .player-tag { font-size: 0.8rem; padding: 0.2rem 0.6rem; }
+      .pill-count { font-size: 1rem; padding: 0.2rem 0.8rem; }
+      .hierarchy-item { font-size: 0.75rem; }
+    }
+  </style>
+</head>
+<body>
+<div class="game-container" id="gameContainer">
+  <h1>KALLANUM POLICEUM</h1>
+  <div class="sub">👑 ROYAL HIERARCHY · 4–11 PLAYERS 👮</div>
+
+  <div id="appRoot"></div>
+</div>
+
+<script>
+  (function(){
+    // ----- UPDATED HIERARCHY with 11 roles -----
+    const HIERARCHY_BASE = [
+      { role: 'King', points: 1000 },
+      { role: 'Queen', points: 500 },
+      { role: 'Manthri', points: 400 },
+      { role: 'Commander', points: 350 },
+      { role: 'Soldier', points: 300 },
+      { role: 'Watchman', points: 250 },
+      { role: 'Spy', points: 200 },
+      { role: 'Gardener', points: 150 },
+      { role: 'Milkman', points: 100 },
+      { role: 'Police', points: 50 },
+      { role: 'Thief', points: 0 }
+    ];
+
+    // ----- SOUND EFFECTS using Web Audio API -----
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+    
+    function initAudio() {
+      if (audioCtx) return;
+      try {
+        audioCtx = new AudioContext();
+      } catch(e) {
+        console.log("Web Audio not supported");
+      }
+    }
+
+    function playSound(type) {
+      initAudio();
+      if (!audioCtx) return;
+      
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      
+      const now = audioCtx.currentTime;
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      
+      switch(type) {
+        case 'swish':
+          oscillator.frequency.setValueAtTime(400, now);
+          oscillator.frequency.exponentialRampToValueAtTime(1200, now + 0.4);
+          gainNode.gain.setValueAtTime(0.4, now);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+          break;
+          
+        case 'slap':
+          oscillator.type = 'sawtooth';
+          oscillator.frequency.setValueAtTime(400, now);
+          oscillator.frequency.exponentialRampToValueAtTime(80, now + 0.3);
+          gainNode.gain.setValueAtTime(0.5, now);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+          break;
+          
+        case 'reveal':
+          oscillator.type = 'sine';
+          oscillator.frequency.setValueAtTime(600, now);
+          oscillator.frequency.exponentialRampToValueAtTime(1200, now + 0.2);
+          oscillator.frequency.exponentialRampToValueAtTime(400, now + 0.4);
+          gainNode.gain.setValueAtTime(0.3, now);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+          break;
+          
+        case 'king':
+          oscillator.frequency.setValueAtTime(500, now);
+          oscillator.frequency.setValueAtTime(600, now + 0.15);
+          oscillator.frequency.setValueAtTime(800, now + 0.3);
+          gainNode.gain.setValueAtTime(0.4, now);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+          break;
+          
+        case 'setup':
+          oscillator.frequency.setValueAtTime(300, now);
+          gainNode.gain.setValueAtTime(0.1, now);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+          break;
+      }
+      
+      oscillator.start(now);
+      oscillator.stop(now + 0.8);
+    }
+
+    // ----- GAME STATE -----
+    let players = [];
+    let stage = 'START';
+    let currentRevealIndex = 0;
+    let activeRoleIndex = 0;
+    let currentHierarchy = [];
+    let roundStartScores = [];
+
+    // helpers -------------------------------------------------
+    function generateRoleSet(count) {
+      if (count === 4) {
+        return ['King', 'Queen', 'Police', 'Thief'];
+      }
+      return HIERARCHY_BASE.slice(0, count).map(obj => obj.role);
+    }
+
+    function resetSafe() {
+      players.forEach(p => p.safe = false);
+    }
+
+    function shuffleRolesForRound() {
+      const roleNames = generateRoleSet(players.length);
+      const shuffled = [...roleNames];
+      for (let i=shuffled.length-1; i>0; i--) {
+        const j = Math.floor(Math.random()*(i+1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      players.forEach((p,idx) => {
+        p.role = shuffled[idx];
+        p.safe = false;
+      });
+      currentHierarchy = roleNames;
+    }
+
+    function getActivePlayer() {
+      if (!currentHierarchy.length || activeRoleIndex >= currentHierarchy.length) return null;
+      let role = currentHierarchy[activeRoleIndex];
+      return players.find(p => p.role === role);
+    }
+
+    function getNextRole() {
+      if (activeRoleIndex+1 < currentHierarchy.length) return currentHierarchy[activeRoleIndex+1];
+      return null;
+    }
+
+    function advanceToNextRole() {
+      if (activeRoleIndex+1 < currentHierarchy.length) {
+        activeRoleIndex++;
+        return true;
+      }
+      return false;
+    }
+
+    function getUnsafeNames() {
+      return players.filter(p => !p.safe).map(p => p.name);
+    }
+
+    // Function to get badge class based on role
+    function getRoleBadgeClass(role) {
+      if (role === 'Thief') return 'thief-badge';
+      return 'safe-badge';
+    }
+
+    // ENHANCED animation helper with CLEAR role swap info
+    function showEffect(type, message, detail1 = null, detail2 = null) {
+      const overlay = document.createElement('div');
+      overlay.className = 'effect-overlay';
+      
+      if (type === 'swish') {
+        overlay.innerHTML = `<div class="swish-card">✨ ${message} ✨</div>`;
+      } else if (type === 'slap' && detail1 && detail2) {
+        overlay.innerHTML = `
+          <div class="slap-card">
+            👋 ROLE SWAP! 👋
+            <div class="swap-detail">
+              <span>${detail1.name}</span> 🔄 <span>${detail2.name}</span><br>
+              <small>${detail1.oldRole} ⇄ ${detail2.oldRole}</small>
+            </div>
+          </div>
+        `;
+      } else {
+        overlay.innerHTML = `<div class="${type}-card">${message}</div>`;
+      }
+      
+      document.body.appendChild(overlay);
+      playSound(type);
+      
+      setTimeout(() => {
+        overlay.style.animation = 'fadeOut 0.5s forwards';
+        setTimeout(() => {
+          overlay.remove();
+        }, 500);
+      }, 2200);
+    }
+
+    // Function to handle input focus - clears default text
+    function setupNameInputs() {
+      for (let i = 0; i < players.length; i++) {
+        const input = document.getElementById(`name_${i}`);
+        if (input) {
+          input.addEventListener('focus', function() {
+            if (this.value === `Player ${i+1}`) {
+              this.value = '';
+              this.classList.remove('default-name');
+            }
+          });
+          
+          input.addEventListener('blur', function() {
+            if (this.value.trim() === '') {
+              this.value = `Player ${i+1}`;
+              this.classList.add('default-name');
+              players[i].name = `Player ${i+1}`;
+            } else {
+              players[i].name = this.value.trim();
+            }
+          });
+          
+          if (input.value === `Player ${i+1}`) {
+            input.classList.add('default-name');
+          }
+        }
+      }
+    }
+
+    // render --------------------------------------------------
+    const root = document.getElementById('appRoot');
+
+    function render() {
+      if (stage === 'START') renderStart();
+      else if (stage === 'SETUP') renderSetup();
+      else if (stage === 'REVEAL') renderReveal();
+      else if (stage === 'KING_REVEAL') renderKingReveal();
+      else if (stage === 'GUESS') renderGuess();
+      else if (stage === 'ROUND_END') renderRoundEnd();
+      else if (stage === 'LEADERBOARD') renderLeaderboard();
+      else root.innerHTML = `<div class="ui-panel">⚠️ error</div>`;
+    }
+
+    function renderStart() {
+      root.innerHTML = `
+        <div class="ui-panel" style="text-align: center;">
+          <div style="font-size: 3rem; margin: 0.5rem 0;">🏰  🗡️  👑</div>
+          <p style="font-size: 1.3rem; margin: 1.5rem; color: #f3e2c7;">social deduction · pass & reveal</p>
+          <button id="startBtn" style="width: 100%;">▶ START GAME</button>
+        </div>
+      `;
+      document.getElementById('startBtn')?.addEventListener('click', ()=>{
+        playSound('setup');
+        stage = 'SETUP';
+        players = [
+          { name: 'Player 1', role:'', score:0, safe:false },
+          { name: 'Player 2', role:'', score:0, safe:false },
+          { name: 'Player 3', role:'', score:0, safe:false },
+          { name: 'Player 4', role:'', score:0, safe:false }
+        ];
+        render();
+      });
+    }
+
+    function renderSetup() {
+      let rows = '';
+      players.forEach((p,i)=>{
+        rows += `
+          <div class="player-row">
+            <span class="player-tag">#${i+1}</span>
+            <input type="text" id="name_${i}" value="${p.name}" placeholder="Enter name">
+          </div>
+        `;
+      });
+      
+      root.innerHTML = `
+        <div class="ui-panel">
+          <div class="flex-row" style="justify-content: space-between;">
+            <span class="pill-count">👥 ${players.length}/11</span>
+            <div style="display: flex; gap: 0.5rem;">
+              <button id="addBtn" ${players.length>=11?'disabled':''}>➕ ADD</button>
+              <button id="removeBtn" ${players.length<=4?'disabled':''}>➖ REMOVE</button>
+            </div>
+          </div>
+          <div class="player-list-scroll" id="playerInputs">${rows}</div>
+          <button id="revealRolesBtn" style="width:100%; margin-top:1rem;">🔐 REVEAL ROLES</button>
+        </div>
+      `;
+      
+      setupNameInputs();
+      
+      document.getElementById('addBtn')?.addEventListener('click', ()=>{
+        if(players.length < 11) {
+          const playerNum = players.length + 1;
+          players.push({ name: `Player ${playerNum}`, role:'', score:0, safe:false });
+          playSound('setup');
+          render();
+        }
+      });
+      
+      document.getElementById('removeBtn')?.addEventListener('click', ()=>{
+        if(players.length > 4) {
+          players.pop();
+          playSound('setup');
+          render();
+        }
+      });
+      
+      document.getElementById('revealRolesBtn')?.addEventListener('click', ()=>{
+        for(let i=0; i<players.length; i++){
+          let inp = document.getElementById(`name_${i}`);
+          if(inp) {
+            const val = inp.value.trim();
+            players[i].name = val || `Player ${i+1}`;
+          }
+        }
+        roundStartScores = players.map(p => p.score);
+        shuffleRolesForRound();
+        resetSafe();
+        currentRevealIndex = 0;
+        stage = 'REVEAL';
+        playSound('reveal');
+        render();
+      });
+    }
+
+    function renderReveal() {
+      if (currentRevealIndex >= players.length) {
+        stage = 'KING_REVEAL';
+        render();
+        return;
+      }
+      const p = players[currentRevealIndex];
+      root.innerHTML = `
+        <div class="ui-panel" style="text-align: center;">
+          <div class="player-tag" style="font-size:1.5rem; display:inline-block;">✨ ${p.name}'s turn ✨</div>
+          <div style="margin: 1.5rem 0;" id="revealBtnContainer">
+            <button id="tapBtn" style="width:100%;">👁️ TAP TO REVEAL</button>
+          </div>
+          <div id="cardArea"></div>
+        </div>
+      `;
+      document.getElementById('tapBtn')?.addEventListener('click', ()=>{
+        playSound('reveal');
+        const roleObj = HIERARCHY_BASE.find(r => r.role === p.role);
+        const cardArea = document.getElementById('cardArea');
+        cardArea.innerHTML = `
+          <div class="role-card">
+            ${p.role} <small>${roleObj.points} points</small>
+          </div>
+        `;
+        const btn = document.getElementById('tapBtn');
+        btn.innerText = '🙈 HIDE & PASS';
+        btn.onclick = ()=>{
+          currentRevealIndex++;
+          render();
+        };
+      });
+    }
+
+    function renderKingReveal() {
+      const king = players.find(p => p.role === 'King');
+      root.innerHTML = `
+        <div class="ui-panel" style="text-align: center;">
+          <div style="font-size: 4rem;">👑</div>
+          <h2 style="font-size: 2rem;">King, reveal yourself</h2>
+          <p style="font-size: 2rem; margin: 1.5rem; color: #e6b86a;">“${king ? king.name : '??'}”</p>
+          <button id="startGuessBtn" style="width:100%;">⚔️ START DEDUCTION</button>
+        </div>
+      `;
+      document.getElementById('startGuessBtn')?.addEventListener('click', ()=>{
+        playSound('king');
+        activeRoleIndex = 0;
+        stage = 'GUESS';
+        render();
+      });
+    }
+
+    function renderGuess() {
+      const active = getActivePlayer();
+      if (!active) { stage = 'ROUND_END'; render(); return; }
+      const nextRole = getNextRole();
+      if (!nextRole) { stage = 'ROUND_END'; render(); return; }
+
+      const unsafe = getUnsafeNames().filter(n => n !== active.name);
+      const options = unsafe.map(n => `<option value="${n}">`).join('');
+      
+      const activeBadgeClass = getRoleBadgeClass(active.role);
+
+      root.innerHTML = `
+        <div class="ui-panel">
+          <div class="flex-row" style="justify-content: center;">
+            <span class="${activeBadgeClass}">ACTIVE: ${active.name} (${active.role})</span>
+          </div>
+          <div style="margin: 1.2rem 0;">
+            <div style="font-size: 1.5rem; text-align:center; color: #f3e2c7;">🔍 Who is <span style="color:#e6b86a;">${nextRole}</span>?</div>
+            <input list="unsafeList" id="guessInput" class="guess-input" placeholder="select player">
+            <datalist id="unsafeList">${options}</datalist>
+            <button id="guessBtn" style="width:100%;">🎯 GUESS</button>
+          </div>
+          <div class="hierarchy-line">
+            ${currentHierarchy.map((r,i)=>`<span class="hierarchy-item">${i===activeRoleIndex?'👉':''}${r}</span>`).join(' ')}
+          </div>
+          <p style="margin-top:0.8rem; text-align:center; color: #f3e2c7;">✅ safe: ${players.filter(p=>p.safe).map(p=>p.name).join(', ') || 'none'}</p>
+        </div>
+      `;
+
+      document.getElementById('guessBtn')?.addEventListener('click', ()=>{
+        const guessedName = document.getElementById('guessInput').value;
+        const guessed = players.find(p => p.name === guessedName);
+        if (!guessed || guessed.safe || guessed.name === active.name) {
+          alert('Invalid guess!');
+          return;
+        }
+        const nextRolePlayer = players.find(p => p.role === nextRole);
+        const correct = (nextRolePlayer && nextRolePlayer.name === guessedName);
+
+        if (correct) {
+          const pts = HIERARCHY_BASE.find(h => h.role === active.role).points;
+          active.score += pts;
+          active.safe = true;
+          
+          showEffect('swish', `+${pts} POINTS!`);
+          
+          setTimeout(() => {
+            if (active.role === 'Police' && nextRole === 'Thief') {
+              stage = 'ROUND_END';
+              render();
+            } else {
+              advanceToNextRole();
+              render();
+            }
+          }, 1500);
+          
+        } else {
+          const oldActiveRole = active.role;
+          const oldGuessedRole = guessed.role;
+          
+          active.role = guessed.role;
+          guessed.role = oldActiveRole;
+          
+          showEffect('slap', 'ROLE SWAP!', 
+            { name: active.name, oldRole: oldActiveRole },
+            { name: guessed.name, oldRole: oldGuessedRole }
+          );
+          
+          setTimeout(() => {
+            render();
+          }, 2500);
+        }
+      });
+    }
+
+    function renderRoundEnd() {
+      const roundScores = players.map(p => ({
+        name: p.name,
+        roundScore: p.score - (roundStartScores[players.indexOf(p)] || 0)
+      })).filter(rs => rs.roundScore > 0);
+
+      const roundScoresHtml = roundScores.length ? 
+        roundScores.map(rs => `<div class="round-score-badge">${rs.name}: +${rs.roundScore}</div>`).join('') :
+        '<div class="round-score-badge">No points this round</div>';
+
+      root.innerHTML = `
+        <div class="ui-panel" style="text-align: center;">
+          <h2 style="font-size: 2rem;">🏁 ROUND FINISHED</h2>
+          <div style="margin: 1.5rem 0;">
+            <h3 style="font-size: 1.5rem; color: #e6b86a;">This Round:</h3>
+            ${roundScoresHtml}
+          </div>
+          <div style="font-size: 1.3rem; margin: 1.5rem 0; background: #6b3a22; padding:1rem; border-radius:40px; border: 2px solid #e6b86a;">
+            <strong style="color: #ffedc2;">Total Scores:</strong><br>
+            <span style="color: #f3e2c7;">${players.map(p=>`${p.name} (${p.score})`).join(' · ')}</span>
+          </div>
+          <div class="flex-row actions" style="justify-content:center;">
+            <button id="nextRoundBtn">➡️ NEXT ROUND</button>
+            <button id="leaderboardBtn">📊 FINAL</button>
+          </div>
+        </div>
+      `;
+      document.getElementById('nextRoundBtn')?.addEventListener('click', ()=>{
+        playSound('setup');
+        roundStartScores = players.map(p => p.score);
+        shuffleRolesForRound();
+        resetSafe();
+        currentRevealIndex = 0;
+        stage = 'REVEAL';
+        render();
+      });
+      document.getElementById('leaderboardBtn')?.addEventListener('click', ()=>{
+        stage = 'LEADERBOARD';
+        render();
+      });
+    }
+
+    function renderLeaderboard() {
+      const sorted = [...players].sort((a,b)=> b.score - a.score);
+      const entries = sorted.map((p,i)=>`
+        <div class="leaderboard-entry">
+          <span style="color: #f3e2c7;">${i===0?'👑 ':''}${p.name}</span>
+          <span class="score">${p.score} pts</span>
+        </div>
+      `).join('');
+      root.innerHTML = `
+        <div class="ui-panel">
+          <h2 style="text-align:center; font-size: 2rem;">👑 FINAL RANKING</h2>
+          <p style="text-align:center; color: #e6b86a;">Total points across all rounds</p>
+          ${entries}
+          <button id="newGameBtn" style="width:100%; margin-top:1.5rem;">🔄 NEW GAME</button>
+        </div>
+      `;
+      document.getElementById('newGameBtn')?.addEventListener('click', ()=>{
+        stage = 'START';
+        players = [];
+        render();
+      });
+    }
+
+    // start
+    render();
+  })();
+</script>
+</body>
+</html>
