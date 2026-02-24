@@ -747,9 +747,10 @@
         setTimeout(() => {
           overlay.remove();
         }, 500);
-      }
+      }, 2000);
+    }
 
-          function showSwap(activeName, guessedName, oldActiveRole, oldGuessedRole) {
+    function showSwap(activeName, guessedName, oldActiveRole, oldGuessedRole) {
       const overlay = document.createElement('div');
       overlay.className = 'effect-overlay';
       overlay.innerHTML = `
