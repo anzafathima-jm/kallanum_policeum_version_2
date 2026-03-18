@@ -7,6 +7,95 @@
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Playfair+Display:ital,wght@0,600;1,600&family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
   
   <style>
+
+
+body {
+  min-height: 100%;
+  overscroll-behavior-y: none;
+}
+
+body {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.game-container {
+  overflow: hidden;
+}
+
+#appRoot {
+  min-height: 240px;
+}
+
+.stage-shell {
+  animation: stageIn 260ms ease-out;
+}
+
+@keyframes stageIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.player-list-scroll {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.restore-banner {
+  background: rgba(30, 61, 51, 0.55);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  color: var(--parchment);
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  text-align: left;
+}
+
+.restore-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.restore-actions button {
+  min-width: auto;
+  font-size: 0.85rem;
+  padding: 0.55rem 0.9rem;
+  margin: 0;
+}
+
+.role-card,
+.guess-section,
+.leaderboard-entry,
+.player-row,
+button,
+.player-row input,
+.guess-input {
+  transition: all 0.18s ease;
+}
+
+@media (max-width: 600px) {
+  .game-container {
+    overscroll-behavior: contain;
+  }
+
+  .restore-banner {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+    
     * {
       margin: 0;
       padding: 0;
@@ -575,528 +664,690 @@
 </div>
 
 <script>
-  (function(){
-    // ===== COMPLETE HIERARCHY (11 roles) =====
-    const HIERARCHY_BASE = [
-      { role: 'King', points: 1000 },
-      { role: 'Queen', points: 500 },
-      { role: 'Manthri', points: 400 },
-      { role: 'Commander', points: 350 },
-      { role: 'Soldier', points: 300 },
-      { role: 'Watchman', points: 250 },
-      { role: 'Spy', points: 200 },
-      { role: 'Gardener', points: 150 },
-      { role: 'Milkman', points: 100 },
-      { role: 'Police', points: 50 },
-      { role: 'Thief', points: 0 }
-    ];
+(function(){
+  const STORAGE_KEY = 'kallanum-policeum-royal-save-v1';
 
-    // ===== SOUND EFFECTS using Web Audio API =====
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    let audioCtx = null;
-    
-    function initAudio() {
-      if (audioCtx) return;
-      try {
-        audioCtx = new AudioContext();
-      } catch(e) {
-        console.log("Web Audio not supported");
+  const HIERARCHY_BASE = [
+    { role: 'King', points: 1000 },
+    { role: 'Queen', points: 500 },
+    { role: 'Manthri', points: 400 },
+    { role: 'Commander', points: 350 },
+    { role: 'Soldier', points: 300 },
+    { role: 'Watchman', points: 250 },
+    { role: 'Spy', points: 200 },
+    { role: 'Gardener', points: 150 },
+    { role: 'Milkman', points: 100 },
+    { role: 'Police', points: 50 },
+    { role: 'Thief', points: 0 }
+  ];
+
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  let audioCtx = null;
+
+  let players = [];
+  let stage = 'START';
+  let currentRevealIndex = 0;
+  let activeRoleIndex = 0;
+  let currentHierarchy = [];
+  let roundStartScores = [];
+  let restoredSessionAvailable = false;
+
+  function initAudio() {
+    if (audioCtx) return;
+    try {
+      audioCtx = new AudioContext();
+    } catch(e) {
+      console.log("Web Audio not supported");
+    }
+  }
+
+  function playSound(type) {
+    initAudio();
+    if (!audioCtx) return;
+
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+
+    const now = audioCtx.currentTime;
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+
+    switch(type) {
+      case 'correct':
+        oscillator.frequency.setValueAtTime(400, now);
+        oscillator.frequency.exponentialRampToValueAtTime(1200, now + 0.4);
+        gainNode.gain.setValueAtTime(0.4, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+        break;
+      case 'swap':
+        oscillator.type = 'sawtooth';
+        oscillator.frequency.setValueAtTime(400, now);
+        oscillator.frequency.exponentialRampToValueAtTime(80, now + 0.3);
+        gainNode.gain.setValueAtTime(0.5, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+        break;
+      case 'reveal':
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(600, now);
+        oscillator.frequency.exponentialRampToValueAtTime(1200, now + 0.2);
+        oscillator.frequency.exponentialRampToValueAtTime(400, now + 0.4);
+        gainNode.gain.setValueAtTime(0.3, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+        break;
+      case 'king':
+        oscillator.frequency.setValueAtTime(500, now);
+        oscillator.frequency.setValueAtTime(600, now + 0.15);
+        oscillator.frequency.setValueAtTime(800, now + 0.3);
+        gainNode.gain.setValueAtTime(0.4, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+        break;
+      case 'setup':
+        oscillator.frequency.setValueAtTime(300, now);
+        gainNode.gain.setValueAtTime(0.1, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+        break;
+    }
+
+    oscillator.start(now);
+    oscillator.stop(now + 0.8);
+  }
+
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, function(char) {
+      return {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[char];
+    });
+  }
+
+  function generateRoleSet(playerCount) {
+    let selectedRoles = ['King', 'Queen', 'Police', 'Thief'];
+    const extraRoles = ['Manthri', 'Commander', 'Soldier', 'Watchman', 'Spy', 'Gardener', 'Milkman'];
+    let extrasNeeded = playerCount - 4;
+
+    for (let i = 0; i < extrasNeeded; i++) {
+      if (i < extraRoles.length) {
+        selectedRoles.splice(2 + i, 0, extraRoles[i]);
       }
     }
+    return selectedRoles;
+  }
 
-    function playSound(type) {
-      initAudio();
-      if (!audioCtx) return;
-      
-      if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-      }
-      
-      const now = audioCtx.currentTime;
-      const oscillator = audioCtx.createOscillator();
-      const gainNode = audioCtx.createGain();
-      
-      oscillator.connect(gainNode);
-      gainNode.connect(audioCtx.destination);
-      
-      switch(type) {
-        case 'correct':
-          oscillator.frequency.setValueAtTime(400, now);
-          oscillator.frequency.exponentialRampToValueAtTime(1200, now + 0.4);
-          gainNode.gain.setValueAtTime(0.4, now);
-          gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
-          break;
-          
-        case 'swap':
-          oscillator.type = 'sawtooth';
-          oscillator.frequency.setValueAtTime(400, now);
-          oscillator.frequency.exponentialRampToValueAtTime(80, now + 0.3);
-          gainNode.gain.setValueAtTime(0.5, now);
-          gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
-          break;
-          
-        case 'reveal':
-          oscillator.type = 'sine';
-          oscillator.frequency.setValueAtTime(600, now);
-          oscillator.frequency.exponentialRampToValueAtTime(1200, now + 0.2);
-          oscillator.frequency.exponentialRampToValueAtTime(400, now + 0.4);
-          gainNode.gain.setValueAtTime(0.3, now);
-          gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
-          break;
-          
-        case 'king':
-          oscillator.frequency.setValueAtTime(500, now);
-          oscillator.frequency.setValueAtTime(600, now + 0.15);
-          oscillator.frequency.setValueAtTime(800, now + 0.3);
-          gainNode.gain.setValueAtTime(0.4, now);
-          gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
-          break;
-          
-        case 'setup':
-          oscillator.frequency.setValueAtTime(300, now);
-          gainNode.gain.setValueAtTime(0.1, now);
-          gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
-          break;
-      }
-      
-      oscillator.start(now);
-      oscillator.stop(now + 0.8);
+  function resetSafe() {
+    players.forEach(p => p.safe = false);
+  }
+
+  function shuffleRolesForRound() {
+    const roleNames = generateRoleSet(players.length);
+    const shuffled = [...roleNames];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
 
-    // ===== GAME STATE =====
-    let players = [];
-    let stage = 'START';
-    let currentRevealIndex = 0;
-    let activeRoleIndex = 0;
-    let currentHierarchy = [];
-    let roundStartScores = [];
+    players.forEach((p, idx) => {
+      p.role = shuffled[idx];
+      p.safe = false;
+    });
 
-    // ===== CORE LOGIC: GENERATE ROLES FOR PLAYER COUNT =====
-    function generateRoleSet(playerCount) {
-      let selectedRoles = ['King', 'Queen', 'Police', 'Thief'];
-      const extraRoles = ['Manthri', 'Commander', 'Soldier', 'Watchman', 'Spy', 'Gardener', 'Milkman'];
-      let extrasNeeded = playerCount - 4;
-      
-      for (let i = 0; i < extrasNeeded; i++) {
-        if (i < extraRoles.length) {
-          selectedRoles.splice(2 + i, 0, extraRoles[i]);
-        }
-      }
-      return selectedRoles;
+    currentHierarchy = roleNames;
+  }
+
+  function getActivePlayer() {
+    if (!currentHierarchy.length || activeRoleIndex >= currentHierarchy.length) return null;
+    let role = currentHierarchy[activeRoleIndex];
+    return players.find(p => p.role === role);
+  }
+
+  function getNextRole() {
+    if (activeRoleIndex + 1 < currentHierarchy.length) return currentHierarchy[activeRoleIndex + 1];
+    return null;
+  }
+
+  function advanceToNextRole() {
+    if (activeRoleIndex + 1 < currentHierarchy.length) {
+      activeRoleIndex++;
+      return true;
     }
+    return false;
+  }
 
-    function resetSafe() {
-      players.forEach(p => p.safe = false);
-    }
+  function getUnsafeNames() {
+    return players.filter(p => !p.safe).map(p => p.name);
+  }
 
-    function shuffleRolesForRound() {
-      const roleNames = generateRoleSet(players.length);
-      const shuffled = [...roleNames];
-      for (let i = shuffled.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-      }
-      
-      players.forEach((p, idx) => {
-        p.role = shuffled[idx];
-        p.safe = false;
-      });
-      
-      currentHierarchy = roleNames;
-    }
+  function isGameInProgress() {
+    return stage !== 'START' && players.length > 0;
+  }
 
-    function getActivePlayer() {
-      if (!currentHierarchy.length || activeRoleIndex >= currentHierarchy.length) return null;
-      let role = currentHierarchy[activeRoleIndex];
-      return players.find(p => p.role === role);
-    }
+  function saveState() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        players,
+        stage,
+        currentRevealIndex,
+        activeRoleIndex,
+        currentHierarchy,
+        roundStartScores
+      }));
+    } catch (e) {}
+  }
 
-    function getNextRole() {
-      if (activeRoleIndex + 1 < currentHierarchy.length) return currentHierarchy[activeRoleIndex + 1];
-      return null;
-    }
+  function clearSavedState() {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch (e) {}
+  }
 
-    function advanceToNextRole() {
-      if (activeRoleIndex + 1 < currentHierarchy.length) {
-        activeRoleIndex++;
-        return true;
-      }
+  function inspectSavedState() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return false;
+      const parsed = JSON.parse(raw);
+      return !!(parsed && Array.isArray(parsed.players) && parsed.players.length);
+    } catch (e) {
       return false;
     }
+  }
 
-    function getUnsafeNames() {
-      return players.filter(p => !p.safe).map(p => p.name);
+  function restoreSavedState() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return false;
+      const parsed = JSON.parse(raw);
+      if (!parsed || !Array.isArray(parsed.players) || !parsed.players.length) return false;
+
+      players = parsed.players;
+      stage = parsed.stage || 'START';
+      currentRevealIndex = parsed.currentRevealIndex || 0;
+      activeRoleIndex = parsed.activeRoleIndex || 0;
+      currentHierarchy = parsed.currentHierarchy || [];
+      roundStartScores = parsed.roundStartScores || [];
+      restoredSessionAvailable = false;
+      return true;
+    } catch (e) {
+      return false;
     }
+  }
 
-    // ===== ANIMATION HELPERS =====
-    function showCorrect(pts, role) {
-      const overlay = document.createElement('div');
-      overlay.className = 'effect-overlay';
-      overlay.innerHTML = `
-        <div class="correct-card">
-          <div>CORRECT!</div>
-          <div style="font-size:4rem; color: var(--gold);">+${pts}</div>
-          <small>POINTS FOR THE ${role}</small>
+  function confirmAbandonIfNeeded() {
+    if (!isGameInProgress()) return true;
+    return confirm('A game is already in progress. Start a new one?');
+  }
+
+  function attachNavigationProtection() {
+    window.addEventListener('beforeunload', function(event) {
+      if (!isGameInProgress()) return;
+      saveState();
+      event.preventDefault();
+      event.returnValue = '';
+    });
+
+    let touchStartY = 0;
+
+    document.addEventListener('touchstart', function(event) {
+      if (!event.touches.length) return;
+      touchStartY = event.touches[0].clientY;
+    }, { passive: true });
+
+    document.addEventListener('touchmove', function(event) {
+      const container = document.getElementById('gameContainer');
+      if (!container || event.touches.length !== 1) return;
+
+      const currentY = event.touches[0].clientY;
+      const pullingDown = currentY > touchStartY;
+      const atTop = container.scrollTop <= 0;
+
+      if (pullingDown && atTop) {
+        event.preventDefault();
+      }
+    }, { passive: false });
+  }
+
+  function showCorrect(pts, role) {
+    const overlay = document.createElement('div');
+    overlay.className = 'effect-overlay';
+    overlay.innerHTML = `
+      <div class="correct-card">
+        <div>CORRECT!</div>
+        <div style="font-size:4rem; color: var(--gold);">+${pts}</div>
+        <small>POINTS FOR THE ${escapeHtml(role)}</small>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    playSound('correct');
+
+    setTimeout(() => {
+      overlay.style.animation = 'fadeOut 0.5s forwards';
+      setTimeout(() => overlay.remove(), 500);
+    }, 2000);
+  }
+
+  function showSwap(activeName, guessedName, oldActiveRole, oldGuessedRole) {
+    const overlay = document.createElement('div');
+    overlay.className = 'effect-overlay';
+    overlay.innerHTML = `
+      <div class="swap-card">
+        <div style="font-size:2rem; margin-bottom:1rem;">ROLE SWAP</div>
+        <div class="swap-detail">
+          <span>${escapeHtml(activeName)}</span> ⇄ <span>${escapeHtml(guessedName)}</span><br>
+          <small style="color: var(--parchment);">${escapeHtml(oldActiveRole)} ↔ ${escapeHtml(oldGuessedRole)}</small>
         </div>
-      `;
-      document.body.appendChild(overlay);
-      playSound('correct');
-      
-      setTimeout(() => {
-        overlay.style.animation = 'fadeOut 0.5s forwards';
-        setTimeout(() => {
-          overlay.remove();
-        }, 500);
-      }, 2000);
-    }
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    playSound('swap');
 
-    function showSwap(activeName, guessedName, oldActiveRole, oldGuessedRole) {
-      const overlay = document.createElement('div');
-      overlay.className = 'effect-overlay';
-      overlay.innerHTML = `
-        <div class="swap-card">
-          <div style="font-size:2rem; margin-bottom:1rem;">⚔️ ROLE SWAP ⚔️</div>
-          <div class="swap-detail">
-            <span>${activeName}</span> ⇄ <span>${guessedName}</span><br>
-            <small style="color: var(--parchment);">${oldActiveRole} ↔ ${oldGuessedRole}</small>
-          </div>
-        </div>
-      `;
-      document.body.appendChild(overlay);
-      playSound('swap');
-      
-      setTimeout(() => {
-        overlay.style.animation = 'fadeOut 0.5s forwards';
-        setTimeout(() => {
-          overlay.remove();
-        }, 500);
-      }, 2000);
-    }
+    setTimeout(() => {
+      overlay.style.animation = 'fadeOut 0.5s forwards';
+      setTimeout(() => overlay.remove(), 500);
+    }, 2000);
+  }
 
-    // ===== SMART NAME INPUT HANDLER =====
-    function setupNameInputs() {
-      for (let i = 0; i < players.length; i++) {
-        const input = document.getElementById(`name_${i}`);
-        if (input) {
-          input.addEventListener('focus', function() {
-            if (this.value === `Noble ${i+1}`) {
-              this.value = '';
-              this.classList.remove('default-name');
-            }
-          });
-          
-          input.addEventListener('blur', function() {
-            if (this.value.trim() === '') {
-              this.value = `Noble ${i+1}`;
-              this.classList.add('default-name');
-              players[i].name = `Noble ${i+1}`;
-            } else {
-              players[i].name = this.value.trim();
-            }
-          });
-          
-          if (input.value === `Noble ${i+1}`) {
-            input.classList.add('default-name');
-          }
+  function setupNameInputs() {
+    for (let i = 0; i < players.length; i++) {
+      const input = document.getElementById(`name_${i}`);
+      if (!input) continue;
+
+      input.addEventListener('focus', function() {
+        if (this.value === `Noble ${i + 1}`) {
+          this.value = '';
+          this.classList.remove('default-name');
         }
+      });
+
+      input.addEventListener('blur', function() {
+        if (this.value.trim() === '') {
+          this.value = `Noble ${i + 1}`;
+          this.classList.add('default-name');
+          players[i].name = `Noble ${i + 1}`;
+        } else {
+          players[i].name = this.value.trim();
+        }
+        saveState();
+      });
+
+      input.addEventListener('input', function() {
+        players[i].name = this.value.trim() || `Noble ${i + 1}`;
+      });
+
+      if (input.value === `Noble ${i + 1}`) {
+        input.classList.add('default-name');
       }
     }
+  }
 
-    // ===== RENDER FUNCTIONS =====
-    const root = document.getElementById('appRoot');
+  const root = document.getElementById('appRoot');
 
-    function render() {
-      if (stage === 'START') renderStart();
-      else if (stage === 'SETUP') renderSetup();
-      else if (stage === 'REVEAL') renderReveal();
-      else if (stage === 'KING_REVEAL') renderKingReveal();
-      else if (stage === 'GUESS') renderGuess();
-      else if (stage === 'ROUND_END') renderRoundEnd();
-      else if (stage === 'LEADERBOARD') renderLeaderboard();
-      else root.innerHTML = `<div class="ui-panel">⚠️ error</div>`;
-    }
+  function withStageShell(html) {
+    return `<div class="stage-shell">${html}</div>`;
+  }
 
-    function renderStart() {
-      root.innerHTML = `
-        <div class="ui-panel" style="text-align: center;">
-          <div style="font-size: 3rem; margin: 0.5rem 0;">🏰  👑  🎭</div>
-          <p style="font-size: 1.2rem; margin: 1rem; color: var(--gold);">The Royal Deduction Game</p>
-          <button id="startBtn" style="width: 100%;">▶ START GAME</button>
+  function renderRestoreBanner() {
+    if (!restoredSessionAvailable || stage !== 'START') return '';
+    return `
+      <div class="restore-banner">
+        <p><strong>Saved game found.</strong><br>Restore the previous match or start fresh.</p>
+        <div class="restore-actions">
+          <button id="restoreBtn" type="button">Restore</button>
+          <button id="discardSaveBtn" type="button">New Game</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function bindRestoreBanner() {
+    document.getElementById('restoreBtn')?.addEventListener('click', () => {
+      if (restoreSavedState()) render();
+    });
+
+    document.getElementById('discardSaveBtn')?.addEventListener('click', () => {
+      clearSavedState();
+      restoredSessionAvailable = false;
+      render();
+    });
+  }
+
+  function render() {
+    if (stage === 'START') renderStart();
+    else if (stage === 'SETUP') renderSetup();
+    else if (stage === 'REVEAL') renderReveal();
+    else if (stage === 'KING_REVEAL') renderKingReveal();
+    else if (stage === 'GUESS') renderGuess();
+    else if (stage === 'ROUND_END') renderRoundEnd();
+    else if (stage === 'LEADERBOARD') renderLeaderboard();
+    else root.innerHTML = withStageShell(`<div class="ui-panel">error</div>`);
+
+    if (stage === 'START' && !restoredSessionAvailable) clearSavedState();
+    else saveState();
+  }
+
+  function renderStart() {
+    root.innerHTML = withStageShell(`
+      ${renderRestoreBanner()}
+      <div class="ui-panel" style="text-align: center;">
+        <div style="font-size: 3rem; margin: 0.5rem 0;">🏰 👑 🎭</div>
+        <p style="font-size: 1.2rem; margin: 1rem; color: var(--gold);">The Royal Deduction Game</p>
+        <button id="startBtn" style="width: 100%;">▶ START GAME</button>
+      </div>
+    `);
+
+    bindRestoreBanner();
+
+    document.getElementById('startBtn')?.addEventListener('click', () => {
+      if (!confirmAbandonIfNeeded()) return;
+      playSound('setup');
+      clearSavedState();
+      stage = 'SETUP';
+      players = [
+        { name: 'Noble 1', role: '', score: 0, safe: false },
+        { name: 'Noble 2', role: '', score: 0, safe: false },
+        { name: 'Noble 3', role: '', score: 0, safe: false },
+        { name: 'Noble 4', role: '', score: 0, safe: false }
+      ];
+      currentRevealIndex = 0;
+      activeRoleIndex = 0;
+      currentHierarchy = [];
+      roundStartScores = [];
+      render();
+    });
+  }
+
+  function renderSetup() {
+    let rows = '';
+    players.forEach((p, i) => {
+      rows += `
+        <div class="player-row">
+          <span class="noble-tag">#${i + 1}</span>
+          <input type="text" id="name_${i}" value="${escapeHtml(p.name)}" placeholder="Enter name">
         </div>
       `;
-      document.getElementById('startBtn')?.addEventListener('click', ()=>{
+    });
+
+    root.innerHTML = withStageShell(`
+      <div class="ui-panel">
+        <div class="flex-row" style="justify-content: space-between;">
+          <span class="pill-count">👥 ${players.length}/11</span>
+          <div style="display: flex; gap: 0.5rem;">
+            <button id="addBtn" ${players.length >= 11 ? 'disabled' : ''}>➕ ADD</button>
+            <button id="removeBtn" ${players.length <= 4 ? 'disabled' : ''}>➖ REMOVE</button>
+          </div>
+        </div>
+        <div class="player-list-scroll" id="playerInputs">${rows}</div>
+        <button id="revealRolesBtn" style="width:100%; margin-top:1rem;">🔐 REVEAL ROLES</button>
+      </div>
+    `);
+
+    setupNameInputs();
+
+    document.getElementById('addBtn')?.addEventListener('click', () => {
+      if (players.length < 11) {
+        const playerNum = players.length + 1;
+        players.push({ name: `Noble ${playerNum}`, role: '', score: 0, safe: false });
         playSound('setup');
-        stage = 'SETUP';
-        players = [
-          { name: 'Noble 1', role: '', score: 0, safe: false },
-          { name: 'Noble 2', role: '', score: 0, safe: false },
-          { name: 'Noble 3', role: '', score: 0, safe: false },
-          { name: 'Noble 4', role: '', score: 0, safe: false }
-        ];
         render();
-      });
+      }
+    });
+
+    document.getElementById('removeBtn')?.addEventListener('click', () => {
+      if (players.length > 4) {
+        players.pop();
+        playSound('setup');
+        render();
+      }
+    });
+
+    document.getElementById('revealRolesBtn')?.addEventListener('click', () => {
+      for (let i = 0; i < players.length; i++) {
+        let inp = document.getElementById(`name_${i}`);
+        if (inp) {
+          const val = inp.value.trim();
+          players[i].name = val || `Noble ${i + 1}`;
+        }
+      }
+
+      roundStartScores = players.map(p => p.score);
+      shuffleRolesForRound();
+      resetSafe();
+      currentRevealIndex = 0;
+      stage = 'REVEAL';
+      playSound('reveal');
+      render();
+    });
+  }
+
+  function renderReveal() {
+    if (currentRevealIndex >= players.length) {
+      stage = 'KING_REVEAL';
+      render();
+      return;
     }
 
-    function renderSetup() {
-      let rows = '';
-      players.forEach((p, i) => {
-        rows += `
-          <div class="player-row">
-            <span class="noble-tag">#${i+1}</span>
-            <input type="text" id="name_${i}" value="${p.name}" placeholder="Enter name">
-          </div>
-        `;
-      });
-      
-      root.innerHTML = `
-        <div class="ui-panel">
-          <div class="flex-row" style="justify-content: space-between;">
-            <span class="pill-count">👥 ${players.length}/11</span>
-            <div style="display: flex; gap: 0.5rem;">
-              <button id="addBtn" ${players.length >= 11 ? 'disabled' : ''}>➕ ADD</button>
-              <button id="removeBtn" ${players.length <= 4 ? 'disabled' : ''}>➖ REMOVE</button>
-            </div>
-          </div>
-          <div class="player-list-scroll" id="playerInputs">${rows}</div>
-          <button id="revealRolesBtn" style="width:100%; margin-top:1rem;">🔐 REVEAL ROLES</button>
+    const p = players[currentRevealIndex];
+    root.innerHTML = withStageShell(`
+      <div class="ui-panel" style="text-align: center;">
+        <div class="noble-tag" style="font-size:1.2rem; display:inline-block; background: var(--gold); color: var(--obsidian);">✨ ${escapeHtml(p.name)}'s turn ✨</div>
+        <div style="margin: 1.5rem 0;" id="revealBtnContainer">
+          <button id="tapBtn" style="width:100%;">👁️ TAP TO REVEAL</button>
+        </div>
+        <div id="cardArea"></div>
+      </div>
+    `);
+
+    document.getElementById('tapBtn')?.addEventListener('click', () => {
+      playSound('reveal');
+      const roleObj = HIERARCHY_BASE.find(r => r.role === p.role);
+      const cardArea = document.getElementById('cardArea');
+      cardArea.innerHTML = `
+        <div class="role-card">
+          ${escapeHtml(p.role)} <small>${roleObj.points} POINTS</small>
         </div>
       `;
-      
-      setupNameInputs();
-      
-      document.getElementById('addBtn')?.addEventListener('click', ()=>{
-        if (players.length < 11) {
-          const playerNum = players.length + 1;
-          players.push({ name: `Noble ${playerNum}`, role: '', score: 0, safe: false });
-          playSound('setup');
-          render();
-        }
-      });
-      
-      document.getElementById('removeBtn')?.addEventListener('click', ()=>{
-        if (players.length > 4) {
-          players.pop();
-          playSound('setup');
-          render();
-        }
-      });
-      
-      document.getElementById('revealRolesBtn')?.addEventListener('click', ()=>{
-        for (let i = 0; i < players.length; i++) {
-          let inp = document.getElementById(`name_${i}`);
-          if (inp) {
-            const val = inp.value.trim();
-            players[i].name = val || `Noble ${i+1}`;
-          }
-        }
-        
-        roundStartScores = players.map(p => p.score);
-        shuffleRolesForRound();
-        resetSafe();
-        currentRevealIndex = 0;
-        stage = 'REVEAL';
-        playSound('reveal');
+      const btn = document.getElementById('tapBtn');
+      btn.innerText = '🙈 HIDE & PASS';
+      btn.onclick = () => {
+        currentRevealIndex++;
         render();
-      });
-    }
+      };
+    }, { once: true });
+  }
 
-    function renderReveal() {
-      if (currentRevealIndex >= players.length) {
-        stage = 'KING_REVEAL';
-        render();
+  function renderKingReveal() {
+    root.innerHTML = withStageShell(`
+      <div class="ui-panel king-reveal">
+        <div style="font-size: 3rem; margin-bottom: 0.5rem;">👑</div>
+        <div class="label">CURRENT REVEAL</div>
+        <div class="role">KING</div>
+        <div class="points">1000 POINTS</div>
+        <button id="startGuessBtn" style="width:100%;">⚔️ PROCEED TO ROUND</button>
+      </div>
+    `);
+
+    document.getElementById('startGuessBtn')?.addEventListener('click', () => {
+      playSound('king');
+      activeRoleIndex = 0;
+      stage = 'GUESS';
+      render();
+    });
+  }
+
+  function renderGuess() {
+    const active = getActivePlayer();
+    if (!active) { stage = 'ROUND_END'; render(); return; }
+
+    const nextRole = getNextRole();
+    if (!nextRole) { stage = 'ROUND_END'; render(); return; }
+
+    const unsafe = getUnsafeNames().filter(n => n !== active.name);
+    const options = unsafe.map(n => `<option value="${escapeHtml(n)}"></option>`).join('');
+
+    root.innerHTML = withStageShell(`
+      <div class="ui-panel">
+        <div class="active-section">
+          <span class="label">ACTIVE:</span>
+          <span class="name">${escapeHtml(active.name)}</span>
+          <span class="role">(${escapeHtml(active.role)})</span>
+        </div>
+
+        <div class="guess-section">
+          <div class="guess-label">GUESS</div>
+          <div class="guess-role">Who is the <span style="color: var(--gold);">${escapeHtml(nextRole)}</span>?</div>
+
+          <input list="unsafeList" id="guessInput" class="guess-input" placeholder="Select player..." autocomplete="off">
+          <datalist id="unsafeList">${options}</datalist>
+
+          <button id="guessBtn" style="width:100%;">🎯 GUESS</button>
+        </div>
+
+        <div class="hierarchy-line">
+          ${currentHierarchy.map((r,i)=>`<span class="hierarchy-item ${i===activeRoleIndex ? 'active' : ''}">${escapeHtml(r)}</span>`).join(' → ')}
+        </div>
+        <p style="margin-top:1rem; text-align:center; color: var(--parchment); opacity:0.7;">✅ safe: ${players.filter(p=>p.safe).map(p=>escapeHtml(p.name)).join(', ') || 'none'}</p>
+      </div>
+    `);
+
+    const submitGuess = () => {
+      const guessedName = document.getElementById('guessInput').value.trim();
+      const guessed = players.find(p => p.name === guessedName);
+
+      if (!guessed || guessed.safe || guessed.name === active.name) {
+        alert('Invalid guess!');
         return;
       }
-      const p = players[currentRevealIndex];
-      root.innerHTML = `
-        <div class="ui-panel" style="text-align: center;">
-          <div class="noble-tag" style="font-size:1.2rem; display:inline-block; background: var(--gold); color: var(--obsidian);">✨ ${p.name}'s turn ✨</div>
-          <div style="margin: 1.5rem 0;" id="revealBtnContainer">
-            <button id="tapBtn" style="width:100%;">👁️ TAP TO REVEAL</button>
-          </div>
-          <div id="cardArea"></div>
-        </div>
-      `;
-      document.getElementById('tapBtn')?.addEventListener('click', ()=>{
-        playSound('reveal');
-        const roleObj = HIERARCHY_BASE.find(r => r.role === p.role);
-        const cardArea = document.getElementById('cardArea');
-        cardArea.innerHTML = `
-          <div class="role-card">
-            ${p.role} <small>${roleObj.points} POINTS</small>
-          </div>
-        `;
-        const btn = document.getElementById('tapBtn');
-        btn.innerText = '🙈 HIDE & PASS';
-        btn.onclick = ()=>{
-          currentRevealIndex++;
-          render();
-        };
-      });
-    }
 
-    function renderKingReveal() {
-      root.innerHTML = `
-        <div class="ui-panel king-reveal">
-          <div style="font-size: 3rem; margin-bottom: 0.5rem;">👑</div>
-          <div class="label">CURRENT REVEAL</div>
-          <div class="role">KING</div>
-          <div class="points">1000 POINTS</div>
-          <button id="startGuessBtn" style="width:100%;">⚔️ PROCEED TO ROUND</button>
-        </div>
-      `;
-      document.getElementById('startGuessBtn')?.addEventListener('click', ()=>{
-        playSound('king');
-        activeRoleIndex = 0;
-        stage = 'GUESS';
-        render();
-      });
-    }
+      const nextRolePlayer = players.find(p => p.role === nextRole);
+      const correct = nextRolePlayer && nextRolePlayer.name === guessedName;
 
-    function renderGuess() {
-      const active = getActivePlayer();
-      if (!active) { stage = 'ROUND_END'; render(); return; }
-      const nextRole = getNextRole();
-      if (!nextRole) { stage = 'ROUND_END'; render(); return; }
+      if (correct) {
+        const pts = HIERARCHY_BASE.find(h => h.role === active.role).points;
+        active.score += pts;
+        active.safe = true;
 
-      const unsafe = getUnsafeNames().filter(n => n !== active.name);
-      const options = unsafe.map(n => `<option value="${n}">`).join('');
+        showCorrect(pts, active.role);
+        saveState();
 
-      root.innerHTML = `
-        <div class="ui-panel">
-          <div class="active-section">
-            <span class="label">ACTIVE:</span>
-            <span class="name">${active.name}</span>
-            <span class="role">(${active.role})</span>
-          </div>
-
-          <div class="guess-section">
-            <div class="guess-label">GUESS</div>
-            <div class="guess-role">Who is the <span style="color: var(--gold);">${nextRole}</span>?</div>
-            
-            <input list="unsafeList" id="guessInput" class="guess-input" placeholder="Select player...">
-            <datalist id="unsafeList">${options}</datalist>
-            
-            <button id="guessBtn" style="width:100%;">🎯 GUESS</button>
-          </div>
-
-          <div class="hierarchy-line">
-            ${currentHierarchy.map((r,i)=>`<span class="hierarchy-item ${i===activeRoleIndex ? 'active' : ''}">${r}</span>`).join(' → ')}
-          </div>
-          <p style="margin-top:1rem; text-align:center; color: var(--parchment); opacity:0.7;">✅ safe: ${players.filter(p=>p.safe).map(p=>p.name).join(', ') || 'none'}</p>
-        </div>
-      `;
-
-      document.getElementById('guessBtn')?.addEventListener('click', ()=>{
-        const guessedName = document.getElementById('guessInput').value;
-        const guessed = players.find(p => p.name === guessedName);
-        if (!guessed || guessed.safe || guessed.name === active.name) {
-          alert('Invalid guess!');
-          return;
-        }
-        const nextRolePlayer = players.find(p => p.role === nextRole);
-        const correct = (nextRolePlayer && nextRolePlayer.name === guessedName);
-
-        if (correct) {
-          const pts = HIERARCHY_BASE.find(h => h.role === active.role).points;
-          active.score += pts;
-          active.safe = true;
-          
-          showCorrect(pts, active.role);
-          
-          setTimeout(() => {
-            if (active.role === 'Police' && nextRole === 'Thief') {
-              stage = 'ROUND_END';
-              render();
-            } else {
-              advanceToNextRole();
-              render();
-            }
-          }, 2000);
-          
-        } else {
-          const oldActiveRole = active.role;
-          const oldGuessedRole = guessed.role;
-          
-          active.role = guessed.role;
-          guessed.role = oldActiveRole;
-          
-          showSwap(active.name, guessed.name, oldActiveRole, oldGuessedRole);
-          
-          setTimeout(() => {
+        setTimeout(() => {
+          if (active.role === 'Police' && nextRole === 'Thief') {
+            stage = 'ROUND_END';
             render();
-          }, 2000);
-        }
-      });
-    }
+          } else {
+            advanceToNextRole();
+            render();
+          }
+        }, 2000);
 
-    function renderRoundEnd() {
-      const roundScores = players.map(p => ({
-        name: p.name,
-        roundScore: p.score - (roundStartScores[players.indexOf(p)] || 0)
-      })).filter(rs => rs.roundScore > 0);
+      } else {
+        const oldActiveRole = active.role;
+        const oldGuessedRole = guessed.role;
 
-      const roundScoresHtml = roundScores.length ? 
-        roundScores.map(rs => `<span class="round-score-badge">${rs.name}: +${rs.roundScore}</span>`).join(' ') :
-        '<span class="round-score-badge">No points this round</span>';
+        active.role = guessed.role;
+        guessed.role = oldActiveRole;
 
-      root.innerHTML = `
-        <div class="ui-panel" style="text-align: center;">
-          <h2 style="font-size: 1.8rem; color: var(--gold);">🏁 ROUND FINISHED</h2>
-          <div style="margin: 1.5rem 0;">
-            <h3 style="font-size: 1.3rem; color: var(--deep-gold);">This Round:</h3>
-            <div>${roundScoresHtml}</div>
-          </div>
-          <div style="font-size: 1.2rem; margin: 1.5rem 0; background: rgba(0,0,0,0.3); padding:1rem;">
-            <strong style="color: var(--gold);">Total Scores:</strong><br>
-            <span style="color: var(--parchment);">${players.map(p=>`${p.name} (${p.score})`).join(' · ')}</span>
-          </div>
-          <div class="flex-row actions" style="justify-content:center;">
-            <button id="nextRoundBtn">➡️ NEXT ROUND</button>
-            <button id="leaderboardBtn">📊 FINAL</button>
-          </div>
+        showSwap(active.name, guessed.name, oldActiveRole, oldGuessedRole);
+        saveState();
+
+        setTimeout(() => {
+          render();
+        }, 2000);
+      }
+    };
+
+    document.getElementById('guessBtn')?.addEventListener('click', submitGuess);
+    document.getElementById('guessInput')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        submitGuess();
+      }
+    });
+  }
+
+  function renderRoundEnd() {
+    const roundScores = players.map((p, index) => ({
+      name: p.name,
+      roundScore: p.score - (roundStartScores[index] || 0)
+    })).filter(rs => rs.roundScore > 0);
+
+    const roundScoresHtml = roundScores.length ?
+      roundScores.map(rs => `<span class="round-score-badge">${escapeHtml(rs.name)}: +${rs.roundScore}</span>`).join(' ') :
+      '<span class="round-score-badge">No points this round</span>';
+
+    root.innerHTML = withStageShell(`
+      <div class="ui-panel" style="text-align: center;">
+        <h2 style="font-size: 1.8rem; color: var(--gold);">🏁 ROUND FINISHED</h2>
+        <div style="margin: 1.5rem 0;">
+          <h3 style="font-size: 1.3rem; color: var(--deep-gold);">This Round:</h3>
+          <div>${roundScoresHtml}</div>
         </div>
-      `;
-      document.getElementById('nextRoundBtn')?.addEventListener('click', ()=>{
-        playSound('setup');
-        roundStartScores = players.map(p => p.score);
-        shuffleRolesForRound();
-        resetSafe();
-        currentRevealIndex = 0;
-        stage = 'REVEAL';
-        render();
-      });
-      document.getElementById('leaderboardBtn')?.addEventListener('click', ()=>{
-        stage = 'LEADERBOARD';
-        render();
-      });
-    }
-
-    function renderLeaderboard() {
-      const sorted = [...players].sort((a,b)=> b.score - a.score);
-      const entries = sorted.map((p,i)=>`
-        <div class="leaderboard-entry">
-          <span style="color: var(--parchment);">${i===0?'👑 ':''}${p.name}</span>
-          <span class="score">${p.score} pts</span>
+        <div style="font-size: 1.2rem; margin: 1.5rem 0; background: rgba(0,0,0,0.3); padding:1rem;">
+          <strong style="color: var(--gold);">Total Scores:</strong><br>
+          <span style="color: var(--parchment);">${players.map(p=>`${escapeHtml(p.name)} (${p.score})`).join(' · ')}</span>
         </div>
-      `).join('');
-      root.innerHTML = `
-        <div class="ui-panel">
-          <h2 style="text-align:center; font-size: 1.8rem; color: var(--gold);">👑 FINAL RANKING</h2>
-          <p style="text-align:center; color: var(--deep-gold);">Total points across all rounds</p>
-          ${entries}
-          <button id="newGameBtn" style="width:100%; margin-top:1.5rem;">🔄 NEW GAME</button>
+        <div class="flex-row actions" style="justify-content:center;">
+          <button id="nextRoundBtn">➡️ NEXT ROUND</button>
+          <button id="leaderboardBtn">📊 FINAL</button>
         </div>
-      `;
-      document.getElementById('newGameBtn')?.addEventListener('click', ()=>{
-        stage = 'START';
-        players = [];
-        render();
-      });
-    }
+      </div>
+    `);
 
-    // Start the game
-    render();
-  })();
+    document.getElementById('nextRoundBtn')?.addEventListener('click', () => {
+      playSound('setup');
+      roundStartScores = players.map(p => p.score);
+      shuffleRolesForRound();
+      resetSafe();
+      currentRevealIndex = 0;
+      stage = 'REVEAL';
+      render();
+    });
+
+    document.getElementById('leaderboardBtn')?.addEventListener('click', () => {
+      stage = 'LEADERBOARD';
+      render();
+    });
+  }
+
+  function renderLeaderboard() {
+    const sorted = [...players].sort((a,b)=> b.score - a.score);
+    const entries = sorted.map((p,i)=>`
+      <div class="leaderboard-entry">
+        <span style="color: var(--parchment);">${i===0?'👑 ':''}${escapeHtml(p.name)}</span>
+        <span class="score">${p.score} pts</span>
+      </div>
+    `).join('');
+
+    root.innerHTML = withStageShell(`
+      <div class="ui-panel">
+        <h2 style="text-align:center; font-size: 1.8rem; color: var(--gold);">👑 FINAL RANKING</h2>
+        <p style="text-align:center; color: var(--deep-gold);">Total points across all rounds</p>
+        ${entries}
+        <button id="newGameBtn" style="width:100%; margin-top:1.5rem;">🔄 NEW GAME</button>
+      </div>
+    `);
+
+    document.getElementById('newGameBtn')?.addEventListener('click', () => {
+      stage = 'START';
+      players = [];
+      currentRevealIndex = 0;
+      activeRoleIndex = 0;
+      currentHierarchy = [];
+      roundStartScores = [];
+      restoredSessionAvailable = false;
+      clearSavedState();
+      render();
+    });
+  }
+
+  restoredSessionAvailable = inspectSavedState();
+  attachNavigationProtection();
+  render();
+})();
 </script>
 </body>
 </html>
