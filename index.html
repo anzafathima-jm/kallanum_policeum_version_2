@@ -859,24 +859,36 @@ button,
   }
 
   function restoreSavedState() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return false;
-      const parsed = JSON.parse(raw);
-      if (!parsed || !Array.isArray(parsed.players) || !parsed.players.length) return false;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
 
-      players = parsed.players;
-      stage = parsed.stage || 'START';
-      currentRevealIndex = parsed.currentRevealIndex || 0;
-      activeRoleIndex = parsed.activeRoleIndex || 0;
-      currentHierarchy = parsed.currentHierarchy || [];
-      roundStartScores = parsed.roundStartScores || [];
-      restoredSessionAvailable = false;
-      return true;
-    } catch (e) {
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.players) || !parsed.players.length) {
+      clearSavedState();
       return false;
     }
+
+    players = parsed.players;
+    stage = parsed.stage || 'START';
+    currentRevealIndex = Number.isInteger(parsed.currentRevealIndex) ? parsed.currentRevealIndex : 0;
+    activeRoleIndex = Number.isInteger(parsed.activeRoleIndex) ? parsed.activeRoleIndex : 0;
+    currentHierarchy = Array.isArray(parsed.currentHierarchy) ? parsed.currentHierarchy : [];
+    roundStartScores = Array.isArray(parsed.roundStartScores) ? parsed.roundStartScores : [];
+
+    if (stage !== 'SETUP' && stage !== 'REVEAL' && stage !== 'KING_REVEAL' &&
+        stage !== 'GUESS' && stage !== 'ROUND_END' && stage !== 'LEADERBOARD') {
+      clearSavedState();
+      return false;
+    }
+
+    restoredSessionAvailable = false;
+    return true;
+  } catch (e) {
+    clearSavedState();
+    return false;
   }
+}
 
   function confirmAbandonIfNeeded() {
     if (!isGameInProgress()) return true;
@@ -1005,16 +1017,54 @@ button,
   }
 
   function bindRestoreBanner() {
-    document.getElementById('restoreBtn')?.addEventListener('click', () => {
-      if (restoreSavedState()) render();
-    });
-
-    document.getElementById('discardSaveBtn')?.addEventListener('click', () => {
-      clearSavedState();
-      restoredSessionAvailable = false;
+  document.getElementById('restoreBtn')?.addEventListener('click', () => {
+    const ok = restoreSavedState();
+    if (ok) {
       render();
-    });
+    } else {
+      restoredSessionAvailable = false;
+      alert('Saved game could not be restored.');
+      render();
+    }
+  });
+
+  document.getElementById('discardSaveBtn')?.addEventListener('click', () => {
+    clearSavedState();
+    restoredSessionAvailable = false;
+    render();
+  });
+}
+
+  function syncBackProtection() {
+  if (isGameInProgress()) {
+    if (!history.state || !history.state.gameGuard) {
+      history.pushState({ gameGuard: true }, '');
+    }
   }
+}
+
+function attachBackButtonProtection() {
+  window.addEventListener('popstate', function () {
+    if (!isGameInProgress()) return;
+
+    const leave = confirm('A game is in progress. Do you want to leave this page?');
+
+    if (leave) {
+      saveState();
+      history.back();
+      return;
+    }
+
+    history.pushState({ gameGuard: true }, '');
+  });
+
+  window.addEventListener('pageshow', function () {
+    restoredSessionAvailable = inspectSavedState();
+    syncBackProtection();
+    render();
+  });
+}
+
 
   function render() {
     if (stage === 'START') renderStart();
@@ -1028,6 +1078,7 @@ button,
 
     if (stage === 'START' && !restoredSessionAvailable) clearSavedState();
     else saveState();
+    syncBackProtection();
   }
 
   function renderStart() {
@@ -1345,8 +1396,10 @@ button,
   }
 
   restoredSessionAvailable = inspectSavedState();
-  attachNavigationProtection();
-  render();
+attachNavigationProtection();
+attachBackButtonProtection();
+syncBackProtection();
+render();
 })();
 </script>
 </body>
